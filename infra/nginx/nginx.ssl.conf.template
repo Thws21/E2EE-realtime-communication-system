@@ -1,0 +1,77 @@
+# Template TLS cho prod. scripts/deploy-ec2.sh render __DOMAIN__ -> nginx.ssl.conf.
+# Phuc vu SPA tinh tu /usr/share/nginx/html (mount tu ./frontend/dist) + proxy api/socket.
+events {}
+
+http {
+  include /etc/nginx/mime.types;
+  default_type application/octet-stream;
+  client_max_body_size 10m;
+  gzip on;
+  gzip_types text/css application/javascript application/json text/plain;
+
+  upstream api_upstream {
+    server api-service:3000;
+  }
+
+  upstream realtime_upstream {
+    server realtime-service:4000;
+  }
+
+  # HTTP: healthcheck + ACME challenge + redirect phan con lai sang HTTPS.
+  server {
+    listen 80;
+    server_name __DOMAIN__;
+
+    location = /healthz {
+      add_header Content-Type text/plain;
+      return 200 'ok';
+    }
+
+    location /.well-known/acme-challenge/ {
+      root /var/www/certbot;
+    }
+
+    location / {
+      return 301 https://$host$request_uri;
+    }
+  }
+
+  # HTTPS app.
+  server {
+    listen 443 ssl;
+    http2 on;
+    server_name __DOMAIN__;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+      try_files $uri /index.html;
+    }
+
+    location /api/ {
+      proxy_pass http://api_upstream;
+      proxy_http_version 1.1;
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /socket.io/ {
+      proxy_pass http://realtime_upstream/socket.io/;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_read_timeout 600s;
+      proxy_send_timeout 600s;
+    }
+  }
+}

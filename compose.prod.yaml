@@ -1,0 +1,19 @@
+# Prod: docker compose -f compose.yaml -f compose.prod.yaml --env-file .env.prod up -d --build
+services:
+  api-service:
+    entrypoint: ["sh", "scripts/docker-entrypoint.sh"]
+
+  gateway:
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/${NGINX_CONF:-nginx.ssl.conf}:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s

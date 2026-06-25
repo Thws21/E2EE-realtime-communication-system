@@ -1,0 +1,22 @@
+# Coturn TURN config (PROD). scripts/deploy-ec2.sh render placeholder -> turnserver.conf.
+# Placeholder: __EXTERNAL_IP__ (Elastic IP), __REALM__ (domain), __TURN_USER__, __TURN_PASS__.
+listening-port=3478
+fingerprint
+lt-cred-mech
+# Credential manh — KHONG dung devuser/devpass tren prod.
+user=__TURN_USER__:__TURN_PASS__
+realm=__REALM__
+# EC2 o sau 1:1 NAT: external-ip = Elastic IP de candidate relay dung dia chi public.
+external-ip=__EXTERNAL_IP__
+no-cli
+no-tls
+no-dtls
+min-port=49152
+max-port=49200
+# Chong lam relay toi mang noi bo / metadata.
+no-multicast-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+log-file=stdout

@@ -1,0 +1,28 @@
+# Dev override (auto-loaded with `docker compose up`).
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  api-service:
+    volumes:
+      - ./api-service:/app
+      - api_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run migrate && npm run dev"
+
+  realtime-service:
+    volumes:
+      - ./realtime-service:/app
+      - realtime_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install --include=optional && npm run dev -- --host 0.0.0.0 --port 5173"
+
+volumes:
+  api_node_modules:
+  realtime_node_modules:
+  frontend_node_modules:

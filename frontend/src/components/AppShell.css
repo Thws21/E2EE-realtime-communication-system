@@ -1,0 +1,103 @@
+.app-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+/* Left panel */
+.app-sidebar {
+  flex-shrink: 0;
+  height: 100%;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+/* Drag handle */
+.app-resize-handle {
+  width: 4px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+}
+
+.app-resize-handle:hover,
+.app-shell.resizing .app-resize-handle {
+  background: var(--color-primary);
+}
+
+/* Right panel */
+.app-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+/* Empty state (no conversation selected) */
+.app-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-8);
+  background: var(--color-surface);
+}
+
+.app-empty-state svg {
+  color: var(--color-border);
+}
+
+.app-empty-state h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.app-empty-state p {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* Mobile: single-panel switching */
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: 100% !important;
+    border-right: none;
+  }
+
+  .app-resize-handle {
+    display: none;
+  }
+
+  .app-main {
+    display: none;
+  }
+
+  .app-shell.has-chat .app-sidebar {
+    display: none;
+  }
+
+  .app-shell.has-chat .app-main {
+    display: flex;
+    background: var(--color-surface);
+  }
+}

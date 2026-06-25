@@ -1,0 +1,124 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-e2ee_app}
+      POSTGRES_USER: ${POSTGRES_USER:-e2ee_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-e2ee_pass}
+    # KHONG publish port o base => prod (compose.yaml + compose.prod.yaml) khong expose postgres ra ngoai;
+    # container khac van noi qua service name "postgres". Local dev publish 5432 trong compose.override.yaml.
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - communication-network
+
+  api-service:
+    build:
+      context: ./api-service
+      target: ${BUILD_TARGET:-development}
+    container_name: api-service
+    restart: unless-stopped
+    env_file:
+      - ./api-service/.env
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - communication-network
+
+  realtime-service:
+    build:
+      context: ./realtime-service
+      target: ${BUILD_TARGET:-development}
+    container_name: realtime-service
+    restart: unless-stopped
+    env_file:
+      - ./realtime-service/.env
+    expose:
+      - "4000"
+    depends_on:
+      api-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks:
+      - communication-network
+
+  coturn:
+    image: coturn/coturn:4.6.3
+    container_name: coturn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49152-49200:49152-49200/udp"
+    volumes:
+      - ./infra/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    networks:
+      - communication-network
+
+  frontend:
+    build:
+      context: ./frontend
+      target: ${BUILD_TARGET:-development}
+    container_name: frontend
+    restart: unless-stopped
+    env_file:
+      - ./frontend/.env
+    expose:
+      - "5173"
+    depends_on:
+      - api-service
+      - realtime-service
+    networks:
+      - communication-network
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/${NGINX_CONF:-nginx.dev.conf}:/etc/nginx/nginx.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - frontend
+      - api-service
+      - realtime-service
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - communication-network
+
+volumes:
+  postgres_data:
+
+networks:
+  communication-network:
+    driver: bridge

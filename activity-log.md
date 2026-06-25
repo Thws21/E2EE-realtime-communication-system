@@ -1,0 +1,12 @@
+- [2026-04-13T09:20:00+07:00] Updated env.example configuration sample
+- [2026-04-17T15:45:00+07:00] Completed RT1 to RT4 implementation
+- [2026-04-23T10:15:00+07:00] Fixed issue in RT3 flow
+- [2026-04-29T16:30:00+07:00] Completed RT5 to RT8 tasks
+- [2026-05-06T11:10:00+07:00] Completed RT9 to RT13 tasks
+- [2026-05-12T14:05:00+07:00] Added internal API call for persisted messages
+- [2026-05-20T09:50:00+07:00] Completed RT13 to RT19 tasks
+- [2026-05-28T17:25:00+07:00] Completed RT20 to RT23 tasks
+- [2026-06-03T13:40:00+07:00] Fixed delayed call handling
+- [2026-06-09T10:35:00+07:00] Completed RT24 to RT26 tasks
+- [2026-06-14T15:15:00+07:00] Fixed health endpoint response
+- [2026-06-19T11:30:00+07:00] Checked and tested RT27 and RT28

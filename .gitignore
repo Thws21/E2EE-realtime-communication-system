@@ -1,0 +1,40 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# environment
+.env
+.env.*
+!.env.example
+!.env.prod.example
+
+# deploy secrets + rendered prod configs (server-only artifacts)
+scripts/deploy.env
+infra/nginx/nginx.ssl.conf
+
+# build
+dist/
+build/
+coverage/
+**/dist/
+**/build/
+
+# logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# claude code
+.claude/

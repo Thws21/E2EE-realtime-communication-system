@@ -1,0 +1,133 @@
+# E2EE Real-Time Communication System
+
+End-to-end encrypted chat and voice/video (1-1) — microservice stack.
+
+## Prerequisites
+
+- Docker Desktop (Compose v2)
+- Git
+
+## Local env (before first `docker compose up`)
+
+```powershell
+# From repo root — creates .env files only if missing (does not overwrite)
+.\scripts\setup-env.ps1
+```
+
+Ensure `api-service/.env` uses host **`postgres`** in `DATABASE_URL` (not `localhost`) when running inside Compose.
+
+After each `git pull`, compare your `.env` files with the matching `.env.example` and add any new keys (e.g. `JWT_ACCESS_SECRET`, `ALLOW_DEV_*` in `realtime-service/.env`, `REALTIME_INTERNAL_BASE_URL` in `api-service/.env`). `JWT_ACCESS_SECRET` and `API_INTERNAL_TOKEN` must match between `api-service` and `realtime-service`.
+
+## Quick start (local dev)
+
+```powershell
+docker compose up --build
+```
+
+On first run (or after API schema changes), migrations run automatically via `compose.override.yaml` (`npm run migrate` before `dev`). Manual fallback:
+
+```powershell
+docker compose exec api-service npm run migrate
+```
+
+Migration `003_device_ecdh_keys` adds device ECDH prekeys for G-lite first-message E2EE. After migrate, each test user should **log in once** so the client uploads its device public key (seed users in `002_seed_test_users.sql` do not include prekeys).
+
+If api/realtime fail with `esbuild/linux-x64` after pull on Windows, reset node_modules volumes:
+
+```powershell
+docker compose down -v
+docker compose up --build
+```
+
+Frontend (Vite 8 / rolldown) needs Linux native bindings in Docker — `compose.override.yaml` runs `npm install --include=optional` (not `npm ci`, because the lockfile is generated on Windows). If frontend keeps restarting, reset only the frontend volume:
+
+```powershell
+docker compose rm -sf frontend
+docker volume rm e2ee-real-time-communication-system_frontend_node_modules
+docker compose up --build -d frontend
+```
+
+Open **http://localhost** (gateway). API: `http://localhost/api/v1/...`, Socket.IO: `http://localhost/socket.io/`.
+
+## First-message E2EE test checklist
+
+After migration `003` and stack is up:
+
+1. **Login Alice once** (uploads device prekey via `PUT /devices/me/ecdh-public-key`).
+2. Verify prekey: `GET /api/v1/users/{aliceUserId}/ecdh-public-key` with any valid bearer token → `200` + `publicKey`.
+3. **Bob** opens chat with Alice (Alice stays on Home or offline).
+4. Bob sends first message → Network shows `GET .../ecdh-public-key` **200**, then `chat:send` ack.
+5. Alice opens chat later → message decrypts from history `aad` (G-lite).
+
+Fallback (Alice never logged in after migrate):
+
+- Bob sends → message queues with “đối phương chưa có khoá mã hoá”.
+- Alice online on Home receives `conversation:created` → auto-joins room → socket exchange → queued messages send.
+
+Compose loads `compose.yaml` + `compose.override.yaml` (bind-mount + `npm run dev`)
+
+## Production-like (local or VM)
+
+```powershell
+copy .env.prod.example .env.prod
+# Edit .env.prod — set POSTGRES_PASSWORD and secrets
+
+docker compose -f compose.yaml --env-file .env.prod up --build -d
+```
+
+Uses `BUILD_TARGET=runtime` and `NGINX_CONF=nginx.conf`. Build frontend `dist/` before prod nginx static works (`npm run build` in `frontend/` once Vite project exists).
+
+## Environment files
+
+| File | Purpose |
+|------|---------|
+| `.env.example` | Dev defaults → copy to `.env` |
+| `.env.prod.example` | Prod template → copy to `.env.prod` |
+| `api-service/.env.example` | API service |
+| `realtime-service/.env.example` | Realtime service |
+| `frontend/.env.example` | Vite (`VITE_*`) |
+
+Root `.env` controls `BUILD_TARGET`, `NGINX_CONF`, and Postgres vars for Compose.
+
+## Service boot contract (owners)
+
+Before full stack healthchecks pass, each owner must deliver:
+
+| Owner | Required in repo | Compose expects |
+|-------|----------------|-----------------|
+| **API** | `package.json`, `package-lock.json`, scripts `dev` / `build` / `start`, `GET /health`, `GET /ready`, listen `PORT`, `DATABASE_URL` with host `postgres` | Image target `development` or `runtime`, entry `dist/index.js` |
+| **Realtime** | Same script pattern, `GET /health`, Socket.IO on HTTP server, port `4000` | `depends_on` api-service healthy |
+| **Frontend** | Vite app, `npm run dev` on `0.0.0.0:5173`, `npm run build` → `dist/`, `VITE_API_BASE_URL=/api/v1`, `VITE_SOCKET_BASE_URL=` (empty) | Gateway dev proxies `/` → `frontend:5173` |
+
+DevOps scope: compose, gateway, nginx, Dockerfiles, env templates — not application UI or business logic.
+
+Minimal boot scaffold (health + Socket.IO listen + Vite placeholder) is in place; owners add business routes, socket auth, and UI.
+
+## Architecture (local)
+
+```
+Browser :80 → gateway (nginx)
+  /           → frontend:5173 (dev) or static dist (prod)
+  /api/*      → api-service:3000
+  /socket.io/ → realtime-service:4000
+api-service → postgres:5432
+```
+
+## Verify infra only (no app code)
+
+```powershell
+docker compose config
+docker compose up -d postgres
+docker compose exec postgres pg_isready -U e2ee_user -d e2ee_app
+```
+
+## Docs
+
+See [`docs/`](docs/) — read in order:
+
+1. [`00-glossary-and-naming.md`](docs/00-glossary-and-naming.md) — glossary and naming conventions
+2. [`01-architecture.md`](docs/01-architecture.md) — system architecture
+3. [`02-api.md`](docs/02-api.md) — REST API contract (FROZEN v1.0.0)
+4. [`03-events.md`](docs/03-events.md) — Socket.IO events (FROZEN v1.0.0)
+5. [`07-deployment-cicd.md`](docs/07-deployment-cicd.md) — deployment and CI/CD
+6. [`08-aws-ec2-deploy.md`](docs/08-aws-ec2-deploy.md) — deploy lên AWS EC2 free tier (HTTPS + TURN, demo)
